@@ -1,12 +1,7 @@
 ﻿class Program2
 {
-    private static readonly string AzureBlobCS = Environment.GetEnvironmentVariable("EGORBOT_AZURE_BLOB_CS");
-    private static readonly string BaseWorkingDir = Environment.GetEnvironmentVariable("EGORBOT_WORKDIR")!;
+    private static readonly string RuntimeRepoDir = Environment.GetEnvironmentVariable("EGORBOT_RUNTIMEREPO")!;
     private static readonly string PrPatchUrl = Environment.GetEnvironmentVariable("EGORBOT_PATCHURL")!;
-    private static readonly string GithubBotName = "EgorBot";
-    private static readonly string GithubAppName = "EgorPerfBot";
-    private static readonly string GithubRepoName = "runtime";
-    private static readonly string GithubRepoOwner = "dotnet";
 
     static async Task Main()
     {
@@ -18,7 +13,7 @@
                 throw new InvalidOperationException("Failed to get the patch");
 
             // Build the coreroots
-            var (baseCoreRoot, diffCoreRoot) = await BuildCoreRuns(BaseWorkingDir, patch,
+            var (baseCoreRoot, diffCoreRoot) = await BuildCoreRuns(RuntimeRepoDir, patch,
                 msg => { });
             Logger.Info("Build finished!");
         }
@@ -46,6 +41,14 @@
         {
             throw new ArgumentException("Benchmark failed to build", exc);
         }
+    }
+
+    public static async Task ApplyPatch(string patchContent, string workingDir)
+    {
+        string fileName = Guid.NewGuid().ToString("N") + ".patch";
+        await File.WriteAllTextAsync(Path.Combine(workingDir, fileName), patchContent);
+        await ProcUtils.Run("git", "apply " + fileName, workingDir: workingDir);
+        File.Delete(Path.Combine(workingDir, fileName));
     }
 
     static async Task<BenchmarkResult> RunBenchmark(string benchmarkDir, string baseCoreRoot, string diffCoreRoot, string extraArgs)
@@ -82,23 +85,8 @@
         return new BenchmarkResult(resultsContent, asmContent);
     }
 
-    static async Task<(string, string)> BuildCoreRuns(string baseWorkDir, string patch, Action<string> logger)
+    static async Task<(string, string)> BuildCoreRuns(string runtimeDir, string patch, Action<string> logger)
     {
-        string runtimeDir = baseWorkDir;
-        Directory.CreateDirectory(runtimeDir);
-        if (Directory.Exists(Path.Combine(runtimeDir, "runtime")))
-        {
-            // Reset
-            runtimeDir = Path.Combine(runtimeDir, "runtime");
-            await GitServices.ResetAndUpdateRepo(runtimeDir);
-        }
-        else
-        {
-            // Clone repo
-            await GitServices.CloneRepo($"https://github.com/{GithubRepoOwner}/{GithubRepoName}.git", runtimeDir);
-            runtimeDir = Path.Combine(runtimeDir, "runtime");
-        }
-
         // Build repo
         await RuntimeService.Build(runtimeDir, logger);
 
@@ -117,7 +105,7 @@
         Directory.Move(coreRoot, Path.Combine(coreRootDir, "Main"));
 
         // Apply the patch and rebuild
-        await GitServices.ApplyPatch(patch, runtimeDir);
+        await ApplyPatch(patch, runtimeDir);
         await RuntimeService.Build(runtimeDir, logger);
 
         Directory.Move(coreRoot, Path.Combine(coreRootDir, "PR"));
