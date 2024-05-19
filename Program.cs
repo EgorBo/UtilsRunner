@@ -1,125 +1,95 @@
-﻿class Program2
+﻿using System.CommandLine;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Octokit;
+using System.IO.Compression;
+
+internal class Program
 {
-    private static readonly string RuntimeRepoDir = Environment.GetEnvironmentVariable("EGORBOT_RUNTIMEREPO")!;
-    private static readonly string PrPatchUrl = Environment.GetEnvironmentVariable("EGORBOT_PATCHURL")!;
+    public const string RepoOwner = "dotnet";
+    public const string RepoName = "runtime";
 
-    static async Task Main()
+    static async Task<int> Main(string[] args)
     {
-        try
-        {
-            // Get the patch
-            string patch = await new HttpClient().GetStringAsync(PrPatchUrl);
-            if (string.IsNullOrWhiteSpace(patch))
-                throw new InvalidOperationException("Failed to get the patch");
+        var artficatsOpt = new Option<string>(name: "--artifacts");
+        var ghIssueOpt = new Option<int>(name: "--issue");
+        var azContainerOpt = new Option<string>(name: "--az_container");
+        var azCsOpt = new Option<string>(name: "--az_cs");
+        var ghTokenOpt = new Option<string>(name: "--gh_token");
+        var ghAppNameOpt = new Option<string>(name: "--gh_appname");
 
-            // Build the coreroots
-            var (baseCoreRoot, diffCoreRoot) = await BuildCoreRuns(RuntimeRepoDir, patch,
-                msg => { });
-            Logger.Info("Build finished!");
-        }
-        catch (Exception e)
+        var rootCommand = new RootCommand();
+        var publishCommand = new Command("publish", "publish BDN results on GH")
         {
-            var errorText = e.InnerException?.Message ?? e.Message;
-            Logger.Error(errorText);
-        }
+            artficatsOpt,
+            ghIssueOpt,
+            azCsOpt,
+            azContainerOpt,
+            ghTokenOpt,
+            ghAppNameOpt
+        };
+        rootCommand.AddCommand(publishCommand);
+        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, ghToken, gtApp) =>
+            {
+                if (!Directory.Exists(artifacts))
+                    throw new ArgumentException($"{artifacts} was not found");
+
+                // First, upload the BDN artifacts to Azure Blob
+                var zipFile = Path.Combine(Path.GetDirectoryName(artifacts)!, "BDN_Artifacts.zip");
+                File.Delete(zipFile);
+                ZipFile.CreateFromDirectory(artifacts, zipFile);
+                var artifactsUrl = await UploadZipToAzure(azToken, azContainer, zipFile);
+
+                string reply = "";
+                foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
+                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n---\n"; 
+                reply += $"[BDN_Artifacts.zip]({artifactsUrl})";
+                await CommentOnGithub(gtApp, ghToken, issue, reply);
+            },
+            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt, ghAppNameOpt);
+
+        // Gosh, how I hate System.CommandLine for verbosity...
+
+        return rootCommand.InvokeAsync(args).Result;
     }
 
-    static async Task BuildBenchmark(string benchmarkDir, string snippet)
+    private static string PrettifyMarkdown(string[] lines)
     {
-        try
+        string content = "";
+        foreach (string i in lines)
         {
-            if (Directory.Exists(benchmarkDir))
-                Directory.Delete(benchmarkDir, true);
-            Directory.CreateDirectory(benchmarkDir);
+            // Remove some noise
+            string line = i.Trim();
+            if (string.IsNullOrEmpty(line) ||
+                line.StartsWith(".NET SDK ") ||
+                line.StartsWith("[Host]") ||
+                line.StartsWith("Job-"))
+                continue;
 
-            await ProcUtils.Run("dotnet", "new console", workingDir: benchmarkDir);
-            await ProcUtils.Run("dotnet", "add package BenchmarkDotNet", workingDir: benchmarkDir);
-            await File.WriteAllTextAsync(Path.Combine(benchmarkDir, "Program.cs"), snippet);
-            await ProcUtils.Run("dotnet", "build -c Release", workingDir: benchmarkDir);
+            // Rename coreruns
+            line = line.Replace("/core_root_base/corerun", "Main")
+                .Replace("/core_root_diff/corerun", "PR");
+            content += line + "\n";
         }
-        catch (Exception exc)
-        {
-            throw new ArgumentException("Benchmark failed to build", exc);
-        }
+        return content;
     }
 
-    public static async Task ApplyPatch(string patchContent, string workingDir)
+    private static async Task<string> UploadZipToAzure(string azureCs, string containerName, string file)
     {
-        string fileName = Guid.NewGuid().ToString("N") + ".patch";
-        await File.WriteAllTextAsync(Path.Combine(workingDir, fileName), patchContent);
-        await ProcUtils.Run("git", "apply " + fileName, workingDir: workingDir);
-        File.Delete(Path.Combine(workingDir, fileName));
+        // Upload to Azure Blob Storage
+        var blobServiceClient = new BlobServiceClient(azureCs);
+        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        var blobClient = containerClient.GetBlobClient(Path.GetFileName(file));
+        await using (FileStream uploadFileStream = File.OpenRead(file))
+            await blobClient.UploadAsync(uploadFileStream, true);
+        await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = "application/zip" });
+        return blobClient.Uri.AbsoluteUri;
     }
 
-    static async Task<BenchmarkResult> RunBenchmark(string benchmarkDir, string baseCoreRoot, string diffCoreRoot, string extraArgs)
+    private static async Task CommentOnGithub(string githubApp, string githubCreds, int issueId, string comment)
     {
-        string bdnArgs =
-            // Run all benchmarks
-            "--filter \"*\" " +
-            // Hide some useless columns
-            "-h Job StdDev RatioSD Median Error " +
-            // Provide our corerun paths
-            $"--coreRun \"{baseCoreRoot}\" \"{diffCoreRoot}\"" +
-            // Custom args
-            extraArgs;
-
-        await ProcUtils.Run("dotnet", "run -c Release -- " + bdnArgs.Trim(' ', '\r', '\n', '\t'),
-            cancellationToken: new CancellationTokenSource(TimeSpan.FromMinutes(10)).Token,
-            workingDir: benchmarkDir);
-
-        string[] markdownResults = Directory.GetFiles(Path.Combine(benchmarkDir, "BenchmarkDotNet.Artifacts", "results"), "*.md");
-
-        if (markdownResults.Length == 0)
-            throw new InvalidOperationException("No *.md files found");
-
-        string resultsContent = markdownResults
-            .Where(md => md.EndsWith("-github.md", StringComparison.OrdinalIgnoreCase))
-            .Aggregate("", (current, md) =>
-                current + $"{string.Join('\n', File.ReadAllLines(md).Where(l => !string.IsNullOrWhiteSpace(l)))}\n  \n");
-
-        string asmContent = markdownResults
-            .Where(md => md.EndsWith("-asm.md", StringComparison.OrdinalIgnoreCase))
-            .Aggregate("", (current, md) =>
-                current + $"{string.Join('\n', File.ReadAllLines(md).Where(l => !string.IsNullOrWhiteSpace(l)))}\n  \n");
-
-        return new BenchmarkResult(resultsContent, asmContent);
-    }
-
-    static async Task<(string, string)> BuildCoreRuns(string runtimeDir, string patch, Action<string> logger)
-    {
-        // Build repo
-        await RuntimeService.Build(runtimeDir, logger);
-
-        // To avoid detecting arch/config, we'll just take the first folder
-        string[] dirs = Directory.GetDirectories(Path.Combine(runtimeDir, "artifacts", "tests", "coreclr"));
-        string dir = dirs.Single(dir => dir.EndsWith(".Release"));
-
-        string coreRootDir = Path.Combine(dir, "Tests");
-        string coreRoot = Path.Combine(coreRootDir, "Core_Root");
-
-        if (Directory.Exists(Path.Combine(coreRootDir, "Main")))
-            Directory.Delete(Path.Combine(coreRootDir, "Main"), true);
-        if (Directory.Exists(Path.Combine(coreRootDir, "PR")))
-            Directory.Delete(Path.Combine(coreRootDir, "PR"), true);
-
-        Directory.Move(coreRoot, Path.Combine(coreRootDir, "Main"));
-
-        // Apply the patch and rebuild
-        await ApplyPatch(patch, runtimeDir);
-        await RuntimeService.Build(runtimeDir, logger);
-
-        Directory.Move(coreRoot, Path.Combine(coreRootDir, "PR"));
-
-        string baseCoreRoot = Path.Combine(Path.Combine(coreRootDir, "Main"), "corerun");
-        string diffCoreRoot = Path.Combine(Path.Combine(coreRootDir, "PR"), "corerun");
-
-        if (OperatingSystem.IsWindows())
-        {
-            baseCoreRoot += ".exe";
-            diffCoreRoot += ".exe";
-        }
-        return (baseCoreRoot, diffCoreRoot);
+        GitHubClient client = new(new ProductHeaderValue(githubApp));
+        client.Credentials = new Credentials(githubCreds);
+        await client.Issue.Comment.Create(RepoOwner, RepoName, issueId, comment);
     }
 }
-
-record BenchmarkResult(string Markdown, string Asm);
