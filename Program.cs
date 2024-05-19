@@ -43,7 +43,7 @@ internal class Program
                 string reply = "";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n---\n"; 
-                reply += $"[BDN_Artifacts.zip]({artifactsUrl})";
+                reply += $"Check [BDN_Artifacts.zip]({artifactsUrl}) for disasm (if DisassemblyDiagnoser was used) and other reports.";
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
             artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt, ghAppNameOpt);
@@ -62,9 +62,11 @@ internal class Program
             string line = i.Trim();
             if (string.IsNullOrEmpty(line) ||
                 line.StartsWith(".NET SDK ") ||
-                line.StartsWith("[Host]") ||
-                line.StartsWith("Job-"))
+                line.StartsWith("[Host]"))
                 continue;
+
+            if (line.StartsWith("Job-"))
+                line = "  " + line;
 
             // Workaround for BDN's bug: https://github.com/dotnet/BenchmarkDotNet/issues/2545
             if (line.EndsWith(":|-"))
