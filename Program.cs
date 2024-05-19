@@ -66,9 +66,13 @@ internal class Program
                 line.StartsWith("Job-"))
                 continue;
 
+            // Workaround for BDN's bug: https://github.com/dotnet/BenchmarkDotNet/issues/2545
+            if (line.EndsWith(":|-"))
+                line = line.Remove(line.Length - 1);
+
             // Rename coreruns
             line = line.Replace("/core_root_base/corerun", "Main")
-                .Replace("/core_root_diff/corerun", "PR");
+                .Replace("/core_root_diff/corerun", "**PR**");
             content += line + "\n";
         }
         return content;
