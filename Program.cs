@@ -43,14 +43,13 @@ internal class Program
                 string reply = "";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n---\n"; 
-                reply += $"Check [BDN_Artifacts.zip]({artifactsUrl}) for disasm (if DisassemblyDiagnoser was used) and other reports.";
+                reply += $"Check [BDN_Artifacts.zip]({artifactsUrl}) for details.";
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
             artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt, ghAppNameOpt);
 
         // Gosh, how I hate System.CommandLine for verbosity...
-
-        return rootCommand.InvokeAsync(args).Result;
+        return await rootCommand.InvokeAsync(args);
     }
 
     private static string PrettifyMarkdown(string[] lines)
