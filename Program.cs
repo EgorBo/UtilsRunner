@@ -3,7 +3,6 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Octokit;
 using System.IO.Compression;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 internal class Program
 {
@@ -17,8 +16,6 @@ internal class Program
         var azContainerOpt = new Option<string>(name: "--az_container");
         var azCsOpt = new Option<string>(name: "--az_cs");
         var ghTokenOpt = new Option<string>(name: "--gh_token");
-        var gistTokenOpt = new Option<string>(name: "--gist_token");
-        var ghAppNameOpt = new Option<string>(name: "--gh_appname");
 
         var rootCommand = new RootCommand();
         var publishCommand = new Command("publish", "publish BDN results on GH")
@@ -28,11 +25,9 @@ internal class Program
             azCsOpt,
             azContainerOpt,
             ghTokenOpt,
-            gistTokenOpt,
-            ghAppNameOpt
         };
         rootCommand.AddCommand(publishCommand);
-        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, ghToken, gistToken, gtApp) =>
+        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, ghToken) =>
             {
                 if (!Directory.Exists(artifacts))
                     throw new ArgumentException($"{artifacts} was not found");
@@ -55,16 +50,17 @@ internal class Program
                 string baseFlame = Path.Combine(artifacts, "base_flamegraph.svg");
                 string diffFlame = Path.Combine(artifacts, "diff_flamegraph.svg");
 
+                var gtApp = "EgorBot";
                 if (File.Exists(baseHotFuncs))
                 {
                     try
                     {
                         reply += $"\n\n## 🔥 Profiler (`perf record`):\n";
                         reply += "<details>\n<summary>click me!</summary>\n\n### Annotated asm\n\n";
-                        reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
-                        reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
-                        reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
-                        reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n\n";
+                        reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
+                        reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
+                        reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
+                        reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n\n";
 
                         if (File.Exists(baseFlame) || File.Exists(diffFlame))
                         {
@@ -93,7 +89,7 @@ internal class Program
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
-            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt, gistTokenOpt, ghAppNameOpt);
+            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt);
 
         // Gosh, how I hate System.CommandLine for verbosity...
         return await rootCommand.InvokeAsync(args);
