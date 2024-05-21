@@ -56,10 +56,10 @@ internal class Program
                 if (File.Exists(baseHotFuncs))
                 {
                     reply += $"\n\n## Profiler (`perf record`):\n";
-                    reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", File.ReadAllText(baseHotFuncs))}) vs ";
-                    reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", File.ReadAllText(diffHotFuncs))})\n";
-                    reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", File.ReadAllText(baseHotAsm))}) vs ";
-                    reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", File.ReadAllText(diffHotAsm))})\n\n";
+                    reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
+                    reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
+                    reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
+                    reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n\n";
                     reply += "_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._";
                 }
 
@@ -69,6 +69,20 @@ internal class Program
 
         // Gosh, how I hate System.CommandLine for verbosity...
         return await rootCommand.InvokeAsync(args);
+    }
+
+    private static string ReadContentSafe(string file)
+    {
+        try
+        {
+            if (File.Exists(file))
+                return File.ReadAllText(file);
+            return "<error>";
+        }
+        catch (Exception e)
+        {
+            return e.ToString();
+        }
     }
 
     private static string PrettifyMarkdown(string[] lines)
