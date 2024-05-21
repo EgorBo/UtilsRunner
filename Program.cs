@@ -65,11 +65,23 @@ internal class Program
                         reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n\n";
 
-                        if (File.Exists(baseFlame))
-                            reply += $"\n[base_flamegraph.svg]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs";
-                        if (File.Exists(diffFlame))
-                            reply += $"[base_flamegraph.svg]({await UploadFileToAzure(azToken, azContainer, diffFlame)})\n\n";
-
+                        if (File.Exists(baseFlame) || File.Exists(diffFlame))
+                        {
+                            reply += "### Flamegraphs:\n<details>\n<summary>click to expand</summary>\n\n";
+                            if (File.Exists(baseFlame))
+                            {
+                                string url = await UploadFileToAzure(azToken, azContainer, baseFlame);
+                                reply += $"[base_flamegraph.svg]({url})\n";
+                                reply += $"![base_flamegraph.svg]({url})\n\n";
+                            }
+                            if (File.Exists(diffFlame))
+                            {
+                                string url = await UploadFileToAzure(azToken, azContainer, diffFlame);
+                                reply += $"[diff_flamegraph.svg]({url})\n";
+                                reply += $"![diff_flamegraph.svg]({url})\n\n";
+                            }
+                            reply += "</details>\n\n";
+                        }
                         reply += "_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._";
                     }
                     catch
