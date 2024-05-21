@@ -3,6 +3,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Octokit;
 using System.IO.Compression;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 internal class Program
 {
@@ -16,6 +17,7 @@ internal class Program
         var azContainerOpt = new Option<string>(name: "--az_container");
         var azCsOpt = new Option<string>(name: "--az_cs");
         var ghTokenOpt = new Option<string>(name: "--gh_token");
+        var gistTokenOpt = new Option<string>(name: "--gist_token");
         var ghAppNameOpt = new Option<string>(name: "--gh_appname");
 
         var rootCommand = new RootCommand();
@@ -26,10 +28,11 @@ internal class Program
             azCsOpt,
             azContainerOpt,
             ghTokenOpt,
+            gistTokenOpt,
             ghAppNameOpt
         };
         rootCommand.AddCommand(publishCommand);
-        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, ghToken, gtApp) =>
+        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, ghToken, gistToken, gtApp) =>
             {
                 if (!Directory.Exists(artifacts))
                     throw new ArgumentException($"{artifacts} was not found");
@@ -42,11 +45,26 @@ internal class Program
 
                 string reply = "";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
-                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n---\n"; 
+                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n---\n";
                 reply += $"Check [BDN_Artifacts.zip]({artifactsUrl}) for details.";
+
+                string baseHotFuncs = Path.Combine(artifacts, "base_functions.txt");
+                string diffHotFuncs = Path.Combine(artifacts, "diff_functions.txt");
+                string baseHotAsm = Path.Combine(artifacts, "base.asm");
+                string diffHotAsm = Path.Combine(artifacts, "diff.asm");
+
+                if (File.Exists(baseHotFuncs))
+                {
+                    reply += $"<br/>Profiler's (`perf record`) output:";
+                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", File.ReadAllText(baseHotFuncs))})";
+                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", File.ReadAllText(diffHotFuncs))})";
+                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", File.ReadAllText(baseHotAsm))})";
+                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", File.ReadAllText(diffHotAsm))})";
+                }
+
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
-            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt, ghAppNameOpt);
+            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt, gistTokenOpt, ghAppNameOpt);
 
         // Gosh, how I hate System.CommandLine for verbosity...
         return await rootCommand.InvokeAsync(args);
@@ -89,6 +107,18 @@ internal class Program
             await blobClient.UploadAsync(uploadFileStream, true);
         await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = "application/zip" });
         return blobClient.Uri.AbsoluteUri;
+    }
+
+    private static async Task<string> CreateGistAsync(string githubApp, string githubCreds, string fileName, string content)
+    {
+        GitHubClient client = new(new ProductHeaderValue(githubApp));
+        client.Credentials = new Credentials(githubCreds);
+        var gist = new NewGist();
+        gist.Description = fileName;
+        gist.Public = false;
+        gist.Files.Add(fileName, content);
+        var result = await client.Gist.Create(gist);
+        return result.HtmlUrl;
     }
 
     private static async Task CommentOnGithub(string githubApp, string githubCreds, int issueId, string comment)
