@@ -41,9 +41,9 @@ internal class Program
                 var zipFile = Path.Combine(Path.GetDirectoryName(artifacts)!, "BDN_Artifacts.zip");
                 File.Delete(zipFile);
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
-                var artifactsUrl = await UploadZipToAzure(azToken, azContainer, zipFile);
+                var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile);
 
-                string reply = "## Results:\n";
+                string reply = "### Results:\n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
                 reply += $"See [BDN_Artifacts.zip]({artifactsUrl}) for details.";
@@ -52,14 +52,22 @@ internal class Program
                 string diffHotFuncs = Path.Combine(artifacts, "diff_functions.txt");
                 string baseHotAsm = Path.Combine(artifacts, "base.asm");
                 string diffHotAsm = Path.Combine(artifacts, "diff.asm");
+                string baseFlame = Path.Combine(artifacts, "base_flamegraph.svg");
+                string diffFlame = Path.Combine(artifacts, "diff_flamegraph.svg");
 
                 if (File.Exists(baseHotFuncs))
                 {
-                    reply += $"\n\n## Profiler (`perf record`):\n";
+                    reply += $"\n\n### Profiler (`perf record`):\n";
                     reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                     reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
                     reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
                     reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n\n";
+
+                    if (File.Exists(baseFlame))
+                        reply += $"\n[base_flamegraph.svg]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs";
+                    if (File.Exists(diffFlame))
+                        reply += $"[base_flamegraph.svg]({await UploadFileToAzure(azToken, azContainer, diffFlame)})\n\n";
+
                     reply += "_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._";
                 }
 
@@ -112,7 +120,7 @@ internal class Program
         return content;
     }
 
-    private static async Task<string> UploadZipToAzure(string azureCs, string containerName, string file)
+    private static async Task<string> UploadFileToAzure(string azureCs, string containerName, string file)
     {
         // Upload to Azure Blob Storage
         var blobServiceClient = new BlobServiceClient(azureCs);
@@ -120,7 +128,14 @@ internal class Program
         var blobClient = containerClient.GetBlobClient(Path.GetFileName(file));
         await using (FileStream uploadFileStream = File.OpenRead(file))
             await blobClient.UploadAsync(uploadFileStream, true);
-        await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = "application/zip" });
+
+        string contentType = "application/zip";
+        if (file.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            contentType = "image/png";
+        if (file.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+            contentType = "image/svg+xml";
+
+        await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
         return blobClient.Uri.AbsoluteUri;
     }
 
