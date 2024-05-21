@@ -43,7 +43,7 @@ internal class Program
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
                 var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile);
 
-                string reply = "## Results:\n";
+                string reply = "## Results\n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
                 reply += $"See [BDN_Artifacts.zip]({artifactsUrl}) for details.";
@@ -59,7 +59,7 @@ internal class Program
                 {
                     try
                     {
-                        reply += $"\n\n## Profiler (`perf record`):\n";
+                        reply += $"\n\n## 🔥 Profiler (`perf record`):\n";
                         reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
                         reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
