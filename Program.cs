@@ -43,10 +43,10 @@ internal class Program
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
                 var artifactsUrl = await UploadZipToAzure(azToken, azContainer, zipFile);
 
-                string reply = "";
+                string reply = "## Results:\n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
-                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n---\n";
-                reply += $"Check [BDN_Artifacts.zip]({artifactsUrl}) for details.";
+                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
+                reply += $"See [BDN_Artifacts.zip]({artifactsUrl}) for details.";
 
                 string baseHotFuncs = Path.Combine(artifacts, "base_functions.txt");
                 string diffHotFuncs = Path.Combine(artifacts, "diff_functions.txt");
@@ -55,11 +55,12 @@ internal class Program
 
                 if (File.Exists(baseHotFuncs))
                 {
-                    reply += $"<br/>Profiler's (`perf record`) output:";
-                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", File.ReadAllText(baseHotFuncs))})";
-                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", File.ReadAllText(diffHotFuncs))})";
-                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", File.ReadAllText(baseHotAsm))})";
-                    reply += $"<br/>({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", File.ReadAllText(diffHotAsm))})";
+                    reply += $"\n\n## Profiler (`perf record`):\n";
+                    reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, gistToken, "base_functions.txt", File.ReadAllText(baseHotFuncs))}) vs ";
+                    reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, gistToken, "diff_functions.txt", File.ReadAllText(diffHotFuncs))})\n";
+                    reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, gistToken, "base_asm.asm", File.ReadAllText(baseHotAsm))}) vs ";
+                    reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, gistToken, "diff_asm.asm", File.ReadAllText(diffHotAsm))})\n\n";
+                    reply += "_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._";
                 }
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
