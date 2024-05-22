@@ -56,32 +56,18 @@ internal class Program
                     try
                     {
                         reply += $"\n\n## 🔥 Profiler (`perf record`):\n";
-                        reply += "<details>\n<summary>click me!</summary>\n\n### Annotated asm\n\n";
+                        reply += $"[base_flamegraph.svg]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs ";
+                        reply += $"[diff_flamegraph.svg]({await UploadFileToAzure(azToken, azContainer, diffFlame)}) (interactive!)\n";
                         reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
                         reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
-                        reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})";
-
-                        if (File.Exists(baseFlame) || File.Exists(diffFlame))
-                        {
-                            reply += "\n\n### Flamegraphs\n\n";
-                            if (File.Exists(baseFlame))
-                            {
-                                string url = await UploadFileToAzure(azToken, azContainer, baseFlame);
-                                reply += $"[base_flamegraph.svg]({url}) vs ";
-                            }
-                            if (File.Exists(diffFlame))
-                            {
-                                string url = await UploadFileToAzure(azToken, azContainer, diffFlame);
-                                reply += $"[diff_flamegraph.svg]({url})";
-                            }
-                        }
-                        reply += "\n\n_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n\n";
-                        reply += "_NOTE: `perf` is not working correctly on Arm64 Azure VMs :'(_\n\n";
-                        reply += "</details>\n\n";
+                        reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n";
+                        reply += "\n_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
+                        reply += "_NOTE: `perf` doesn't work on Arm64 Azure VMs 😔\n";
                     }
-                    catch
+                    catch (Exception exc)
                     {
+                        Console.WriteLine(exc.ToString());
                     }
                 }
 
@@ -155,6 +141,8 @@ internal class Program
 
     private static async Task<string> CreateGistAsync(string githubApp, string githubCreds, string fileName, string content)
     {
+        if (string.IsNullOrWhiteSpace(content))
+            return "";
         GitHubClient client = new(new ProductHeaderValue(githubApp));
         client.Credentials = new Credentials(githubCreds);
         var gist = new NewGist();
