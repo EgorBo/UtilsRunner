@@ -60,25 +60,23 @@ internal class Program
                         reply += $"[base_functions.txt]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[diff_functions.txt]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
                         reply += $"[base_asm.asm]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
-                        reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n\n";
+                        reply += $"[diff_asm.asm]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})";
 
                         if (File.Exists(baseFlame) || File.Exists(diffFlame))
                         {
-                            reply += "### Flamegraphs\n\n";
+                            reply += "\n\n### Flamegraphs\n\n";
                             if (File.Exists(baseFlame))
                             {
                                 string url = await UploadFileToAzure(azToken, azContainer, baseFlame);
-                                reply += $"[base_flamegraph.svg]({url})  <-- click here for interactive editor\n";
-                                reply += $"![base_flamegraph.svg]({url})\n\n";
+                                reply += $"[base_flamegraph.svg]({url}) vs ";
                             }
                             if (File.Exists(diffFlame))
                             {
                                 string url = await UploadFileToAzure(azToken, azContainer, diffFlame);
-                                reply += $"[diff_flamegraph.svg]({url})  <-- click here for interactive editor\n";
-                                reply += $"![diff_flamegraph.svg]({url})\n\n";
+                                reply += $"[diff_flamegraph.svg]({url})";
                             }
                         }
-                        reply += "_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n\n";
+                        reply += "\n\n_NOTE: for clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n\n";
                         reply += "_NOTE: `perf` is not working correctly on Arm64 Azure VMs :'(_\n\n";
                         reply += "</details>\n\n";
                     }
