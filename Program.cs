@@ -58,13 +58,12 @@ internal class Program
                         reply += $"\n\n## 🔥Profiler\n";
                         reply += $"Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs ";
                         reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame)}) (interactive!)\n";
-                        reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
-                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
                         reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n";
+                        reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
+                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
                         reply += "<details><summary>Notes</summary>\n\n";
                         reply += "_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
-                        reply += "_`perf` doesn't work on Arm64 Azure VMs_ :'(\n\n";
                         reply += "</details>\n";
                     }
                     catch (Exception exc)
