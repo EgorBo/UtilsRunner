@@ -15,6 +15,7 @@ internal class Program
         var ghIssueOpt = new Option<int>(name: "--issue");
         var azContainerOpt = new Option<string>(name: "--az_container");
         var azCsOpt = new Option<string>(name: "--az_cs");
+        var cpuOpt = new Option<string>(name: "--cpu", () => "");
         var ghTokenOpt = new Option<string>(name: "--gh_token");
 
         var rootCommand = new RootCommand();
@@ -24,10 +25,11 @@ internal class Program
             ghIssueOpt,
             azCsOpt,
             azContainerOpt,
+            cpuOpt,
             ghTokenOpt,
         };
         rootCommand.AddCommand(publishCommand);
-        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, ghToken) =>
+        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, cpu, ghToken) =>
             {
                 if (!Directory.Exists(artifacts))
                     throw new ArgumentException($"{artifacts} was not found");
@@ -38,7 +40,7 @@ internal class Program
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
                 var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile);
 
-                string reply = "## Results\n";
+                string reply = $"## Results {(string.IsNullOrEmpty(cpu) ? "" : "on " + cpu)}\n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
                 reply += $"See [BDN_Artifacts.zip]({artifactsUrl}) for details.";
@@ -74,7 +76,7 @@ internal class Program
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
-            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, ghTokenOpt);
+            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, cpuOpt, ghTokenOpt);
 
         // Gosh, how I hate System.CommandLine for verbosity...
         return await rootCommand.InvokeAsync(args);
