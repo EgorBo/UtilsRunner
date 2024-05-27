@@ -40,9 +40,11 @@ internal class Program
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
                 var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile);
 
-                string reply = $"## Results {(string.IsNullOrEmpty(cpu) ? "" : "on " + cpu)}\n";
+                string reply = $"";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
+
+                reply += "<details><summary>More data</summary>\n\n";
                 reply += $"See [BDN_Artifacts.zip]({artifactsUrl}) for details.";
 
                 string baseHotFuncs = Path.Combine(artifacts, "base_functions.txt");
@@ -57,22 +59,20 @@ internal class Program
                 {
                     try
                     {
-                        reply += $"\n\n## 🔥Profiler\n";
                         reply += $"Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs ";
                         reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame)}) (interactive!)\n";
                         reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n";
                         reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
-                        reply += "<details><summary>Notes</summary>\n\n";
                         reply += "_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
-                        reply += "</details>\n";
                     }
                     catch (Exception exc)
                     {
                         Console.WriteLine(exc.ToString());
                     }
                 }
+                reply += "</details>\n";
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
