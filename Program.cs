@@ -59,13 +59,13 @@ internal class Program
                 {
                     try
                     {
-                        reply += $"Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs ";
-                        reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame)}) (interactive!)\n";
+                        reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs ";
+                        reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame)}) 🔥\n";
                         reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n";
                         reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
-                        reply += "_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
+                        reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
                     }
                     catch (Exception exc)
                     {
