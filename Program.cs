@@ -17,6 +17,7 @@ internal class Program
         var azCsOpt = new Option<string>(name: "--az_cs");
         var cpuOpt = new Option<string>(name: "--cpu", () => "");
         var ghTokenOpt = new Option<string>(name: "--gh_token");
+        var jobIdOpt = new Option<string>(name: "--jobid", () => "");
 
         var rootCommand = new RootCommand();
         var publishCommand = new Command("publish", "publish BDN results on GH")
@@ -27,25 +28,27 @@ internal class Program
             azContainerOpt,
             cpuOpt,
             ghTokenOpt,
+            jobIdOpt
         };
         rootCommand.AddCommand(publishCommand);
-        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, cpu, ghToken) =>
+        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, cpu, ghToken, jobId) =>
             {
                 if (!Directory.Exists(artifacts))
                     throw new ArgumentException($"{artifacts} was not found");
+
+                string id = string.IsNullOrWhiteSpace(jobId) ? Guid.NewGuid().ToString("N").Substring(0, 8) : jobId;
 
                 // First, upload the BDN artifacts to Azure Blob
                 var zipFile = Path.Combine(Path.GetDirectoryName(artifacts)!, "BDN_Artifacts.zip");
                 File.Delete(zipFile);
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
-                var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile);
+                var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile, id);
 
                 string reply = $"";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
 
-                reply += "<details><summary>More data</summary>\n\n";
-                reply += $"See [BDN_Artifacts.zip]({artifactsUrl}) for details.";
+                reply += $"[BDN_Artifacts.zip]({artifactsUrl})";
 
                 string baseHotFuncs = Path.Combine(artifacts, "base_functions.txt");
                 string diffHotFuncs = Path.Combine(artifacts, "diff_functions.txt");
@@ -57,26 +60,27 @@ internal class Program
                 var gtApp = "EgorBot";
                 if (File.Exists(baseHotFuncs))
                 {
+                    reply += "<details><summary>Profiler🔥</summary>\n\n";
                     try
                     {
-                        reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame)}) vs ";
-                        reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame)}) 🔥\n";
-                        reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, "base_asm.asm", ReadContentSafe(baseHotAsm))}) vs ";
-                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_asm.asm", ReadContentSafe(diffHotAsm))})\n";
-                        reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, "base_functions.txt", ReadContentSafe(baseHotFuncs))}) vs ";
-                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, "diff_functions.txt", ReadContentSafe(diffHotFuncs))})\n";
+                        reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) vs ";
+                        reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame, id)}) 🔥\n";
+                        reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))}) vs ";
+                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_asm_{id}.asm", ReadContentSafe(diffHotAsm))})\n";
+                        reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_functions_{id}.txt", ReadContentSafe(baseHotFuncs))}) vs ";
+                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_functions_{id}.txt", ReadContentSafe(diffHotFuncs))})\n";
                         reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
                     }
                     catch (Exception exc)
                     {
                         Console.WriteLine(exc.ToString());
                     }
+                    reply += "</details>\n";
                 }
-                reply += "</details>\n";
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
-            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, cpuOpt, ghTokenOpt);
+            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, cpuOpt, ghTokenOpt, jobIdOpt);
 
         // Gosh, how I hate System.CommandLine for verbosity...
         return await rootCommand.InvokeAsync(args);
@@ -88,7 +92,7 @@ internal class Program
         {
             if (File.Exists(file))
                 return File.ReadAllText(file);
-            return "<error>";
+            return "<file was not found>";
         }
         catch (Exception e)
         {
@@ -123,12 +127,18 @@ internal class Program
         return content;
     }
 
-    private static async Task<string> UploadFileToAzure(string azureCs, string containerName, string file)
+    private static async Task<string> UploadFileToAzure(string azureCs, string containerName, string file, string id)
     {
+        if (!File.Exists(file))
+            return "file.notfound";
+
         // Upload to Azure Blob Storage
         var blobServiceClient = new BlobServiceClient(azureCs);
         var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-        var blobClient = containerClient.GetBlobClient(Path.GetFileName(file));
+
+        var ext = Path.GetExtension(file);
+        var filename = Path.GetFileNameWithoutExtension(file);
+        var blobClient = containerClient.GetBlobClient(filename + $"_{id}" + ext);
         await using (FileStream uploadFileStream = File.OpenRead(file))
             await blobClient.UploadAsync(uploadFileStream, true);
 
@@ -145,7 +155,7 @@ internal class Program
     private static async Task<string> CreateGistAsync(string githubApp, string githubCreds, string fileName, string content)
     {
         if (string.IsNullOrWhiteSpace(content))
-            return "";
+            return "file.notfound";
         GitHubClient client = new(new ProductHeaderValue(githubApp));
         client.Credentials = new Credentials(githubCreds);
         var gist = new NewGist();
