@@ -121,7 +121,7 @@ internal class Program
 
             // Rename coreruns
             line = line.Replace("/core_root_base/corerun", "Main")
-                .Replace("/core_root_diff/corerun", "**PR**");
+                .Replace("/core_root_diff/corerun", "PR");
             content += line + "\n";
         }
         return content;
