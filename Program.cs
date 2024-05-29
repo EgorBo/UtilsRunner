@@ -44,7 +44,10 @@ internal class Program
                 ZipFile.CreateFromDirectory(artifacts, zipFile);
                 var artifactsUrl = await UploadFileToAzure(azToken, azContainer, zipFile, id);
 
-                string reply = $"";
+                if (string.IsNullOrWhiteSpace(cpu))
+                    cpu = "Intel";
+
+                string reply = $"<details><summary>Benchmark results on {cpu}</summary>\n\n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
 
@@ -60,7 +63,6 @@ internal class Program
                 var gtApp = "EgorBot";
                 if (File.Exists(baseHotFuncs))
                 {
-                    reply += "<details><summary>Profiler🔥</summary>\n\n";
                     try
                     {
                         reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) vs ";
@@ -75,8 +77,8 @@ internal class Program
                     {
                         Console.WriteLine(exc.ToString());
                     }
-                    reply += "</details>\n";
                 }
+                reply += "\n\n</details>\n";
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
