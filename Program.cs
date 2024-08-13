@@ -61,7 +61,7 @@ internal class Program
                 string diffFlame = Path.Combine(artifacts, "diff_flamegraph.svg");
 
                 var gtApp = "EgorBot";
-                if (File.Exists(baseHotFuncs))
+                if (File.Exists(baseHotFuncs) && File.Exists(diffHotFuncs))
                 {
                     try
                     {
@@ -78,6 +78,21 @@ internal class Program
                         Console.WriteLine(exc.ToString());
                     }
                 }
+                else if (File.Exists(baseHotFuncs))
+                {
+                    try
+                    {
+                        reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)})\n";
+                        reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))})\n";
+                        reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_functions_{id}.txt", ReadContentSafe(baseHotFuncs))})\n";
+                        reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
+                    }
+                    catch (Exception exc)
+                    {
+                        Console.WriteLine(exc.ToString());
+                    }
+                }
+
                 reply += "\n\n</details>\n";
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
