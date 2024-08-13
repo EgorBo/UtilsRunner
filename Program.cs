@@ -3,6 +3,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Octokit;
 using System.IO.Compression;
+using System.CommandLine.Parsing;
 
 internal class Program
 {
@@ -11,6 +12,7 @@ internal class Program
 
     static async Task<int> Main(string[] args)
     {
+        var fileOpt = new Option<string>(name: "--file");
         var artficatsOpt = new Option<string>(name: "--artifacts");
         var ghIssueOpt = new Option<int>(name: "--issue");
         var azContainerOpt = new Option<string>(name: "--az_container");
@@ -31,6 +33,22 @@ internal class Program
             jobIdOpt
         };
         rootCommand.AddCommand(publishCommand);
+
+        var uploadCommand = new Command("upload", "upload file to Azure")
+        {
+            fileOpt,
+            azCsOpt,
+            azContainerOpt,
+        };
+        rootCommand.AddCommand(uploadCommand);
+
+        uploadCommand.SetHandler(async (file, azToken, azContainer) =>
+        {
+            string id = Guid.NewGuid().ToString("N").Substring(0, 8);
+            var uploadedUrl = await UploadFileToAzure(azToken, azContainer, file, id);
+            Console.WriteLine(uploadedUrl);
+        }, fileOpt, azCsOpt, azContainerOpt);
+
         publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, cpu, ghToken, jobId) =>
             {
                 if (!Directory.Exists(artifacts))
@@ -164,6 +182,8 @@ internal class Program
             contentType = "image/png";
         if (file.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
             contentType = "image/svg+xml";
+        if (file.EndsWith(".log", StringComparison.OrdinalIgnoreCase))
+            contentType = "text/plain";
 
         await blobClient.SetHttpHeadersAsync(new BlobHttpHeaders { ContentType = contentType });
         return blobClient.Uri.AbsoluteUri;
