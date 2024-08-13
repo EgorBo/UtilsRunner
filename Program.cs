@@ -30,7 +30,8 @@ internal class Program
             azContainerOpt,
             cpuOpt,
             ghTokenOpt,
-            jobIdOpt
+            jobIdOpt,
+            isPrOpt
         };
         rootCommand.AddCommand(publishCommand);
 
