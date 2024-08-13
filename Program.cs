@@ -3,7 +3,6 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Octokit;
 using System.IO.Compression;
-using System.CommandLine.Parsing;
 
 internal class Program
 {
@@ -20,6 +19,7 @@ internal class Program
         var cpuOpt = new Option<string>(name: "--cpu", () => "");
         var ghTokenOpt = new Option<string>(name: "--gh_token");
         var jobIdOpt = new Option<string>(name: "--jobid", () => "");
+        var isPrOpt = new Option<bool>(name: "--ispr", () => true);
 
         var rootCommand = new RootCommand();
         var publishCommand = new Command("publish", "publish BDN results on GH")
@@ -49,7 +49,7 @@ internal class Program
             Console.WriteLine(uploadedUrl);
         }, fileOpt, azCsOpt, azContainerOpt);
 
-        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, cpu, ghToken, jobId) =>
+        publishCommand.SetHandler(async (artifacts, issue, azToken, azContainer, cpu, ghToken, jobId, isPr) =>
             {
                 if (!Directory.Exists(artifacts))
                     throw new ArgumentException($"{artifacts} was not found");
@@ -67,7 +67,7 @@ internal class Program
 
                 string reply = $"<details><summary>Benchmark results on {cpu}</summary>\n\n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
-                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd)) + "\n\n";
+                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd), isPr) + "\n\n";
 
                 reply += $"[BDN_Artifacts.zip]({artifactsUrl})";
 
@@ -115,7 +115,7 @@ internal class Program
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
-            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, cpuOpt, ghTokenOpt, jobIdOpt);
+            artficatsOpt, ghIssueOpt, azCsOpt, azContainerOpt, cpuOpt, ghTokenOpt, jobIdOpt, isPrOpt);
 
         // Gosh, how I hate System.CommandLine for verbosity...
         return await rootCommand.InvokeAsync(args);
@@ -135,7 +135,7 @@ internal class Program
         }
     }
 
-    private static string PrettifyMarkdown(string[] lines)
+    private static string PrettifyMarkdown(string[] lines, bool isPr)
     {
         string content = "";
         foreach (string i in lines)
@@ -155,8 +155,8 @@ internal class Program
                 line = line.Remove(line.Length - 1);
 
             // Rename coreruns
-            line = line.Replace("/core_root_base/corerun", "Main")
-                .Replace("/core_root_diff/corerun", "PR");
+            line = line.Replace("/core_root_base/corerun", isPr ? "Main" : "Before")
+                .Replace("/core_root_diff/corerun", isPr ? "PR" : "After");
             content += line + "\n";
         }
         return content;
