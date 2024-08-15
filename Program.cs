@@ -6,9 +6,6 @@ using System.IO.Compression;
 
 internal class Program
 {
-    public const string RepoOwner = "dotnet";
-    public const string RepoName = "runtime";
-
     static async Task<int> Main(string[] args)
     {
         var fileOpt = new Option<string>(name: "--file");
@@ -208,6 +205,8 @@ internal class Program
     {
         GitHubClient client = new(new ProductHeaderValue(githubApp));
         client.Credentials = new Credentials(githubCreds);
-        await client.Issue.Comment.Create(RepoOwner, RepoName, issueId, comment);
+        await client.Issue.Comment.Create(
+            Environment.GetEnvironmentVariable("GT_OWNER"), 
+            Environment.GetEnvironmentVariable("GT_REPO"), issueId, comment);
     }
 }
