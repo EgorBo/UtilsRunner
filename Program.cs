@@ -81,7 +81,7 @@ internal class Program
                 {
                     try
                     {
-                        reply += $"\n\n🔥 Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)})\n vs ";
+                        reply += $"\n\n🔥 Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) vs ";
                         reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame, id)})\n";
                         reply += $"\nHot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_asm_{id}.asm", ReadContentSafe(diffHotAsm))})\n";
