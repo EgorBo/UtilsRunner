@@ -63,7 +63,7 @@ internal class Program
                 if (string.IsNullOrWhiteSpace(cpu))
                     cpu = "Intel";
 
-                string reply = $"<details><summary>Benchmark results on {cpu}</summary>\n\n";
+                string reply = $"## Benchmark results on `{cpu}`\n  \n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
                     reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd), isPr) + "\n\n";
 
@@ -109,7 +109,7 @@ internal class Program
                     }
                 }
 
-                reply += "\n\n</details>\n";
+                reply += "\n\n\n";
 
                 await CommentOnGithub(gtApp, ghToken, issue, reply);
             },
