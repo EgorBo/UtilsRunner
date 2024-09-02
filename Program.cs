@@ -65,7 +65,7 @@ internal class Program
 
                 string reply = $"## Benchmark results on `{cpu}`\n  \n";
                 foreach (var resultsMd in Directory.GetFiles(artifacts, "*-report-github.md", SearchOption.AllDirectories))
-                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd), isPr) + "\n\n";
+                    reply += PrettifyMarkdown(await File.ReadAllLinesAsync(resultsMd), isPr, cpu) + "\n\n";
 
                 reply += $"[BDN_Artifacts.zip]({artifactsUrl})";
 
@@ -142,7 +142,7 @@ internal class Program
         }
     }
 
-    private static string PrettifyMarkdown(string[] lines, bool isPr)
+    private static string PrettifyMarkdown(string[] lines, bool isPr, string cpu)
     {
         string content = "";
         foreach (string i in lines)
@@ -153,6 +153,8 @@ internal class Program
                 line.StartsWith(".NET SDK ") ||
                 line.StartsWith("[Host]"))
                 continue;
+
+            line = line.Replace("Unknown processor", cpu);
 
             if (line.StartsWith("Job-"))
                 line = "  " + line;
