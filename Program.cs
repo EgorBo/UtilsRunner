@@ -73,6 +73,8 @@ internal class Program
                 string diffHotFuncs = Path.Combine(artifacts, "diff_functions.txt");
                 string baseHotAsm = Path.Combine(artifacts, "base.asm");
                 string diffHotAsm = Path.Combine(artifacts, "diff.asm");
+                string baseStat = Path.Combine(artifacts, "base.stats");
+                string diffStat = Path.Combine(artifacts, "diff.stats");
                 string baseFlame = Path.Combine(artifacts, "base_flamegraph.svg");
                 string diffFlame = Path.Combine(artifacts, "diff_flamegraph.svg");
 
@@ -81,12 +83,18 @@ internal class Program
                 {
                     try
                     {
-                        reply += $"\n\n🔥 Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) vs ";
-                        reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame, id)})\n";
+                        reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) vs ";
+                        reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame, id)}) 🔥\n";
+
                         reply += $"\nHot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_asm_{id}.asm", ReadContentSafe(diffHotAsm))})\n";
+
                         reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_functions_{id}.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_functions_{id}.txt", ReadContentSafe(diffHotFuncs))})\n";
+
+                        reply += $"\nCounters: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_counters_{id}.txt", ReadContentSafe(baseStat))}) vs ";
+                        reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_counters_{id}.txt", ReadContentSafe(diffStat))})\n";
+
                         reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
                     }
                     catch (Exception exc)
@@ -98,9 +106,10 @@ internal class Program
                 {
                     try
                     {
-                        reply += $"\n\n🔥 Flame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)})\n";
+                        reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) 🔥\n";
                         reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))})\n";
                         reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_functions_{id}.txt", ReadContentSafe(baseHotFuncs))})\n";
+                        reply += $"Counters: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_counters_{id}.txt", ReadContentSafe(baseStat))})\n";
                         reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
                     }
                     catch (Exception exc)
