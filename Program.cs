@@ -86,13 +86,13 @@ internal class Program
                         reply += $"\n\nFlame graphs: [Main]({await UploadFileToAzure(azToken, azContainer, baseFlame, id)}) vs ";
                         reply += $"[PR]({await UploadFileToAzure(azToken, azContainer, diffFlame, id)}) 🔥\n";
 
-                        reply += $"\nHot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))}) vs ";
+                        reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_asm_{id}.asm", ReadContentSafe(diffHotAsm))})\n";
 
                         reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_functions_{id}.txt", ReadContentSafe(baseHotFuncs))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_functions_{id}.txt", ReadContentSafe(diffHotFuncs))})\n";
 
-                        reply += $"\nCounters: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_counters_{id}.txt", ReadContentSafe(baseStat))}) vs ";
+                        reply += $"Counters: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_counters_{id}.txt", ReadContentSafe(baseStat))}) vs ";
                         reply += $"[PR]({await CreateGistAsync(gtApp, ghToken, $"diff_counters_{id}.txt", ReadContentSafe(diffStat))})\n";
 
                         reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
