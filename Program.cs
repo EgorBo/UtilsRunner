@@ -90,7 +90,8 @@ internal class Program
                     string baseFlame = Path.Combine(subDir, "base_flamegraph.svg");
                     string diffFlame = Path.Combine(subDir, "diff_flamegraph.svg");
 
-                    reply += $"\n### Profile for `{benchName}`:\n";
+                    benchName = benchName.Replace("PerfBench__", "");
+                    reply += $"\n#### Profile for `{benchName}`:\n";
 
                     if (File.Exists(baseHotFuncs) && File.Exists(diffHotFuncs))
                     {
@@ -121,7 +122,6 @@ internal class Program
                             reply += $"Hot asm: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_asm_{id}.asm", ReadContentSafe(baseHotAsm))})\n";
                             reply += $"Hot functions: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_functions_{id}.txt", ReadContentSafe(baseHotFuncs))})\n";
                             reply += $"Counters: [Main]({await CreateGistAsync(gtApp, ghToken, $"base_counters_{id}.txt", ReadContentSafe(baseStat))})\n";
-                            reply += "\n_For clean `perf` results, make sure you have just one `[Benchmark]` in your app._\n";
                         }
                         catch (Exception exc)
                         {
