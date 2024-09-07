@@ -90,8 +90,8 @@ internal class Program
                     string baseFlame = Path.Combine(subDir, "base_flamegraph.svg");
                     string diffFlame = Path.Combine(subDir, "diff_flamegraph.svg");
 
-                    // = benchName.Replace("PerfBench__", "");
-                    //reply += $"\n#### Profile for `{benchName}`:\n";
+                    benchName = benchName.Replace("PerfBench__", "");
+                    reply += $"\n#### Profile for `{benchName}`:\n";
 
                     if (File.Exists(baseHotFuncs) && File.Exists(diffHotFuncs))
                     {
